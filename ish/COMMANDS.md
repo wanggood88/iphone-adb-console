@@ -44,6 +44,55 @@ adb connect 192.168.1.50:5555 && adb install -r -g /root/app.apk && adb shell "g
 
 > 首次连接先在**车机屏幕**点一次「允许 USB 调试」并勾「始终允许」；建议先单独跑一次 `adb connect IP:5555` + `adb devices` 确认状态是 `device` 再跑三连，避免 `unauthorized` 时白装一遍。
 
+## 实战：安装 iPhone 上的 QiPlay.apk，并授 READ_LOGS
+
+### 1. 先把 APK 放进 iSH 能看到的地方（关键）
+
+iSH 是 iOS 沙盒里的 Alpine，**看不到「文件」App 里的任意路径**，必须先挪进去：
+
+1. iOS「文件」App → 浏览 → 右上角「…」→ 编辑 → 打开「**iSH**」位置开关 → 完成
+2. 找到 `QiPlay.apk`（下载项 / 微信 / QQ / iCloud 都行）→ 长按「拷贝」→ 进入 **iSH → root** 文件夹 → 粘贴
+3. 回 iSH 确认（`~` 就是 `/root`）：
+
+```sh
+ls -l ~/QiPlay.apk
+```
+
+路径写作 **`/root/QiPlay.apk`**（或 `~/QiPlay.apk`）。**大小写敏感**：`QiPlay.apk` ≠ `qiplay.apk`。别把「我的 iPhone/…」这种 iOS 路径直接写进 adb 命令，iSH 里不存在。
+
+> 备选：APK 若有下载链接，可直接在 iSH 里下载，省去拖拽：`apk add curl && curl -L -o ~/QiPlay.apk "<URL>"`
+
+### 2. 一次跑完：连接 → 安装 → 授权
+
+```sh
+adb connect 192.168.1.50:5555 \
+  && adb install -r -g /root/QiPlay.apk \
+  && adb shell pm grant com.qipay android.permission.READ_LOGS \
+  && adb shell am force-stop com.qipay
+```
+
+- 只想要「连接 → 安装 → 执行 adb 命令」这三步，删掉最后一行即可；加 `am force-stop` 是因为 **READ_LOGS 授权后要重启 App 才生效**。
+- **`-g` 只自动授运行时权限，管不了 READ_LOGS**（它是 `signature|privileged|development` 权限），所以 `pm grant` 那条不能省。
+- 顺序不能反：必须先装好、且包名确实是 `com.qipay`，才能 grant。
+- `pm grant` 这条没有 `;` / 管道，**不需要加引号**。
+
+> 为什么这条命令能成立：`READ_LOGS` 虽是系统级权限，但同时属于 **DEVELOPMENT_TOOLS（development）** 组，只要 APK 的 manifest 里声明过 `<uses-permission android:name="android.permission.READ_LOGS"/>`，就能由 `adb shell pm grant` 授予**普通应用，不需要 root**——这是抓日志类工具的通行做法。反过来，若 APK 没声明它，怎么 grant 都失败。
+
+### 3. 验证与排错
+
+```sh
+adb shell pm list packages | grep -i qipay                 # 确认真实包名（装完才有）
+adb shell dumpsys package com.qipay | grep -i READ_LOGS    # 看到 granted=true 即成功
+```
+
+| 报错 / 现象 | 原因与处理 |
+| --- | --- |
+| `Unknown package: com.qipay` | 包名不对或没装上。用 `pm list packages \| grep -i qi` 查真实包名，替换 grant 里的值 |
+| `has not requested permission` / `Operation not allowed` | APK manifest 没声明 READ_LOGS，`pm grant` 无能为力，需换声明过该权限的版本 / 系统签名版 |
+| `SecurityException` / `permission denied` | 厂商 ROM 拦截。到车机开发者选项打开「**USB 调试(安全设置)**」或「**禁用权限监控**」，部分机型需重启后再试 |
+| 命令没报错但授权不生效 | 执行 `adb shell am force-stop com.qipay` 后重新打开 App |
+| 能授权但读不到全局日志 | Android 4.1+ 普通应用本就只能读自己进程的日志；看全局需 root / 系统签名，这是系统限制 |
+
 ## 0. 第一次准备（只做一次）
 
 ```sh
