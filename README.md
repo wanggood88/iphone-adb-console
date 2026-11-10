@@ -158,6 +158,12 @@ sh ish/start.sh
 4. Safari 打开 **`http://127.0.0.1:8000`**（用 `http`，不要 `https`），填口令 → 输入车机 IP、端口 5555 → 连接 → 装/卸应用。启用 `IADC_SHELL=1` 后页面会出现「自定义 adb shell」输入框。
 5. 也可以不通过浏览器，直接在 iSH 终端敲 `adb connect IP:5555`、`adb install -r x.apk`、`adb uninstall 包名`、`adb shell ...`。
 
+> **iSH 里怎么敲命令、怎么一次执行多条**：见 [ish/COMMANDS.md](ish/COMMANDS.md)。最常用的是一条命令串完「连接 → 安装 → 执行 adb 命令」：
+> ```sh
+> adb connect 192.168.1.50:5555 && adb install -r -g /root/app.apk && adb shell pm list packages -3
+> ```
+> 用 `&&` 串联（失败即停）；最后一条命令若带 `;` / 管道，整串要加引号，否则会被 iSH 本地 shell 拆开。文档里还有 `for` 循环批量装卸、脚本文件、车机摸底与精简预装的完整示例。
+
 ### 组网：别押注在 iPhone 个人热点上
 
 Safari 访问 `127.0.0.1` 是本机 loopback，**与热点/WiFi 怎么组无关**；只有 iSH 里 `adb connect` 那一跳需要能到达车机的 5555。
