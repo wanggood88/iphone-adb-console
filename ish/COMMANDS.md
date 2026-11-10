@@ -48,34 +48,49 @@ adb connect 192.168.1.50:5555 && adb install -r -g /root/app.apk && adb shell "g
 
 ### 1. 先把 APK 放进 iSH 能看到的地方（关键）
 
-iSH 是 iOS 沙盒里的 Alpine，**看不到「文件」App 里的任意路径**，必须先挪进去。**只要先打开过一次 iSH 这个 App，它的文件位置通常就自动出现在「文件」App 里，不需要任何「编辑 / 启用」开关。**
+iSH 是 iOS 沙盒里的 Alpine，**看不到「文件」App 里的任意路径**，必须先挪进去。
 
-**推荐做法：用「共享」直接存进去（最省事，不用找侧边栏）**
+#### ✅ 首选：从 iSH 终端里挂载（完全不用在「文件」App 里找 iSH 文件夹）
 
-1. 在「文件」App（或微信 / QQ / Safari 下载项）里找到 `QiPlay.apk` → 长按 → 「**共享**」→ 「**存储到「文件」**」/「存储到文件」
-2. 在目标位置的「位置」列表里选 **iSH** → 进 `root` 文件夹 → 点「存储」
+iSH 内置 `mount -t ios`，会从 App 内部弹出系统文件选择器，把 iOS 侧的文件夹挂进 Linux。这是绕开所有「位置 / 编辑 / 侧边栏」差异的最可靠办法：
 
-**传统做法：拷贝粘贴（找不到「编辑」就用这个）**
+```sh
+mkdir -p /mnt
+mount -t ios . /mnt
+```
 
-1. 「文件」App → 底部「**浏览**」→ 在「**位置**」下直接点 **iSH** → 进 `root` 文件夹
-   （如果看不到「位置 / 个人收藏 / 标签」这几个标题，**再点一次底部「浏览」**回到顶层，Apple 官方说明）
-2. 找到 `QiPlay.apk` → 长按「拷贝」→ 回到 **iSH → root** → 长按空白处「粘贴」
+执行后会弹出**系统文件夹选择器** → 选中 `QiPlay.apk` 所在的那个文件夹（如「下载项」/「我的 iPhone」里某个目录，选**文件夹**不是文件）→ 确定。然后：
 
-**关于「… → 编辑」**：那是旧版 iOS / iPad 侧边栏的说法，新版 iPhone 上往往没有。Apple 官方指南里「编辑」按钮在**浏览页屏幕顶部**，且只用于隐藏位置、排序，**不是启用开关**——找不到它是正常的，跳过即可。若「位置」里确实没有 iSH，再试：
+```sh
+ls -l /mnt/QiPlay.apk                    # 能看到文件就成功了
+cp /mnt/QiPlay.apk /root/QiPlay.apk      # 拷进 iSH 自己的目录，后续路径就不依赖挂载
+ls -l ~/QiPlay.apk                       # 确认
+umount /mnt                              # 用完卸载（可选）
+```
 
-- 「位置」下方点「**更多位置**」（部分版本是右上角「…」→「更多位置」）→ 打开 iSH → 完成
-- 完全退出并重新打开「文件」App；先打开一次 iSH App 让它注册文件提供者
-- 仍不行：重启 iPhone 一次
+挂载是临时的，退出 iSH 会失效；所以**建议 `cp` 到 `/root`**，之后就能一直用 `/root/QiPlay.apk`。
 
-**回 iSH 确认（`~` 就是 `/root`）：**
+#### 「没有 iSH 文件夹」的两种含义
+
+| 你说的是 | 说明与处理 |
+| --- | --- |
+| **「文件」App 的「位置」列表里没有 iSH 这一项** | 正常，很多版本不显示。首选上面的 `mount` 方案，完全不需要它。也可从 iSH 内部直接打开：**iSH 齿轮设置 → Filesystems → default → Browse Files**，会跳到「文件」App 并直接定位到 iSH 的文件系统 |
+| 进入了 iSH 位置，但里面**没有叫 `root` 的文件夹** | iSH 暴露的就是整个 Alpine 根目录，看到的可能是 `bin`、`etc`、`root`、`home` 等一列文件夹；有 `root` 就进 `root`，没有就直接在当前层粘贴，之后用 `ls` / `find / -iname 'QiPlay*' 2>/dev/null` 找实际位置 |
+
+**关于「… → 编辑」**：那是旧版 iOS / iPad 侧边栏的说法，新版 iPhone 上往往没有。Apple 官方指南里「编辑」在**浏览页屏幕顶部**，且只用于隐藏位置 / 排序，不是启用开关——找不到是正常的，跳过。若确实想让 iSH 出现在侧边栏：「位置」下方点「**更多位置**」（或右上角「…」）→ 打开 iSH；再不行就重开「文件」App / 重启 iPhone 一次。
+
+#### 其他两条备选
+
+- **共享菜单**：在「文件」App / 微信 / QQ 里找到 `QiPlay.apk` → 长按 → 共享 → 「存储到「文件」」→ 目标选 **iSH** → 存到 `root`（前提是上面那个位置存在）。
+- **直接下载**：APK 若有链接，连共享菜单都不用：`apk add curl && curl -L -o ~/QiPlay.apk "<URL>"`。
+
+**最终验证（不管走哪条）：**
 
 ```sh
 ls -l ~/QiPlay.apk
 ```
 
-路径写作 **`/root/QiPlay.apk`**（或 `~/QiPlay.apk`）。**大小写敏感**：`QiPlay.apk` ≠ `qiplay.apk`。别把「我的 iPhone/…」这种 iOS 路径直接写进 adb 命令，iSH 里不存在。
-
-> **完全绕开「文件」App 的备选**：APK 若有下载链接，直接在 iSH 里下载，连共享菜单都不用：`apk add curl && curl -L -o ~/QiPlay.apk "<URL>"`。另外 iSH 也支持在 App 内用 `mount` 挂载「文件」App 里选中的文件夹，但对新手更绕，通常不必。
+有输出就能用 **`/root/QiPlay.apk`**（或 `~/QiPlay.apk`）。**大小写敏感**：`QiPlay.apk` ≠ `qiplay.apk`。别把「我的 iPhone/…」这种 iOS 路径直接写进 adb 命令，iSH 里不存在；若 APK 在微信 / QQ 里而「文件」App 找不到，先在那个 App 里用「共享 → 存储到「文件」」把它放进「下载项」，再挂载那个文件夹。
 
 ### 2. 一次跑完：连接 → 安装 → 授权
 
@@ -90,6 +105,7 @@ adb connect 192.168.1.50:5555 \
 - **`-g` 只自动授运行时权限，管不了 READ_LOGS**（它是 `signature|privileged|development` 权限），所以 `pm grant` 那条不能省。
 - 顺序不能反：必须先装好、且包名确实是 `com.qipay`，才能 grant。
 - `pm grant` 这条没有 `;` / 管道，**不需要加引号**。
+- 若第 1 步只做了挂载、没 `cp`，把路径改成 **`/mnt/QiPlay.apk`** 即可（挂载状态下）；建议还是 `cp` 到 `/root`，避免 iSH 重启后挂载失效。
 
 > 为什么这条命令能成立：`READ_LOGS` 虽是系统级权限，但同时属于 **DEVELOPMENT_TOOLS（development）** 组，只要 APK 的 manifest 里声明过 `<uses-permission android:name="android.permission.READ_LOGS"/>`，就能由 `adb shell pm grant` 授予**普通应用，不需要 root**——这是抓日志类工具的通行做法。反过来，若 APK 没声明它，怎么 grant 都失败。
 
