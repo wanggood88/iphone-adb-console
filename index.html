@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f2f2f7">
+<title>iPhone ADB 控制台</title>
+<style>
+:root{
+  --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --sub:#6e6e73; --line:#e5e5ea;
+  --primary:#007aff; --danger:#ff3b30; --ok:#248a3d; --warn:#c88100;
+  --logbg:#f7f7f9; --shadow:0 1px 3px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --card:#1c1c1e; --text:#f2f2f7; --sub:#98989f; --line:#38383a;
+    --primary:#0a84ff; --danger:#ff453a; --ok:#30d158; --warn:#ff9f0a;
+    --logbg:#2c2c2e; --shadow:none;
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%;
+  padding-top:env(safe-area-inset-top);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+}
+.wrap{max-width:680px;margin:0 auto;padding:18px 14px 8px;}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;}
+.logo{
+  flex:0 0 auto;width:42px;height:42px;border-radius:11px;
+  background:var(--primary);color:#fff;font-size:12px;font-weight:700;letter-spacing:.5px;
+  display:flex;align-items:center;justify-content:center;
+}
+h1{font-size:18px;line-height:1.25;margin:0;font-weight:600;}
+.sub{font-size:12px;color:var(--sub);margin:3px 0 0;}
+.pill{
+  flex:0 0 auto;font-size:12px;padding:6px 11px;border-radius:999px;white-space:nowrap;
+  background:rgba(0,122,255,.12);color:var(--primary);
+}
+.pill.bad{background:rgba(255,59,48,.13);color:var(--danger);}
+.alert{
+  background:rgba(255,59,48,.10);color:var(--danger);
+  padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.55;
+  margin-bottom:14px;white-space:pre-wrap;
+}
+.card{
+  background:var(--card);border-radius:15px;padding:16px;margin-bottom:14px;
+  box-shadow:var(--shadow);border:1px solid var(--line);
+}
+.card h2{
+  font-size:15px;font-weight:600;margin:0 0 12px;
+  display:flex;align-items:center;gap:8px;
+}
+.num{
+  width:21px;height:21px;border-radius:50%;flex:0 0 auto;
+  background:rgba(0,122,255,.13);color:var(--primary);
+  font-size:12px;display:inline-flex;align-items:center;justify-content:center;
+}
+.row{display:flex;gap:8px;align-items:stretch;margin-bottom:10px;}
+input[type=text],input[type=password],input[type=number],input[type=search],select{
+  width:100%;min-width:0;font-size:16px;line-height:1.3;
+  padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+  background:transparent;color:var(--text);
+  -webkit-appearance:none;appearance:none;
+}
+input::placeholder{color:var(--sub);}
+input:focus,select:focus{outline:2px solid rgba(0,122,255,.4);outline-offset:0;}
+.row .port{flex:0 0 92px;}
+.row select{flex:0 0 112px;}
+.row .btn{flex:0 0 auto;}
+.btn{
+  min-height:44px;padding:0 16px;border-radius:10px;
+  border:1px solid var(--line);background:var(--card);color:var(--text);
+  font-size:15px;font-weight:500;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;cursor:pointer;white-space:nowrap;
+}
+.btn:active{opacity:.72;}
+.btn.primary{background:var(--primary);color:#fff;border-color:transparent;}
+.btn.danger{background:var(--danger);color:#fff;border-color:transparent;}
+.btn.ghost-danger{background:transparent;color:var(--danger);border-color:var(--danger);}
+.btn.wide{width:100%;margin-top:2px;}
+.btn.tiny{min-height:32px;padding:0 11px;font-size:13px;border-radius:8px;}
+.btn:disabled{opacity:.45;cursor:default;}
+.hint{font-size:12px;color:var(--sub);margin:10px 0 0;line-height:1.55;}
+.filepick{
+  display:block;position:relative;overflow:hidden;text-align:center;
+  border:1px dashed var(--line);border-radius:10px;padding:19px 12px;
+  color:var(--primary);font-size:15px;margin-bottom:10px;cursor:pointer;
+}
+.filepick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+.device-list,.pkg-list{margin-top:12px;max-height:270px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.device,.pkg{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 2px;border-bottom:1px solid var(--line);
+}
+.device:last-child,.pkg:last-child{border-bottom:none;}
+.device{cursor:pointer;}
+.device.active{background:rgba(0,122,255,.09);border-radius:9px;padding-left:9px;padding-right:9px;}
+.meta{flex:1;min-width:0;}
+.serial{font-size:14px;font-weight:500;word-break:break-all;}
+.detail{font-size:12px;color:var(--sub);margin-top:3px;word-break:break-all;}
+.name{
+  flex:1;min-width:0;font-size:13px;word-break:break-all;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+.state{font-size:11px;color:var(--ok);}
+.state.off{color:var(--warn);}
+.empty{color:var(--sub);font-size:13px;text-align:center;padding:18px 6px;line-height:1.5;}
+.loghead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.loghead h2{margin:0;}
+.log{
+  background:var(--logbg);border:1px solid var(--line);border-radius:10px;
+  padding:10px;max-height:230px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;
+  white-space:pre-wrap;word-break:break-all;
+}
+.line{padding:5px 0;border-bottom:1px solid var(--line);}
+.line:last-child{border-bottom:none;}
+.line.ok{color:var(--ok);}
+.line.err{color:var(--danger);}
+.line.dim{color:var(--sub);}
+.toast{
+  position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom));
+  transform:translate(-50%,12px);opacity:0;pointer-events:none;z-index:99;
+  background:rgba(28,28,30,.94);color:#fff;padding:12px 18px;border-radius:12px;
+  font-size:14px;max-width:82%;text-align:center;transition:opacity .22s,transform .22s;
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+footer{color:var(--sub);font-size:12px;line-height:1.65;padding:6px 4px 34px;}
+footer strong{color:var(--warn);font-weight:600;}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">ADB</div>
+      <div>
+        <h1>iPhone ADB 控制台</h1>
+        <p class="sub">通过 5555 无线调试管理 Android 应用</p>
+      </div>
+    </div>
+    <div id="statusPill" class="pill">检测中</div>
+  </header>
+
+  <div id="alert" class="alert hidden"></div>
+
+  <section id="tokenCard" class="card hidden">
+    <h2>访问口令</h2>
+    <p class="hint">服务端启用了访问口令，请输入后才能操作。</p>
+    <div class="row" style="margin-top:10px;margin-bottom:0;">
+      <input id="tokenInput" type="password" placeholder="输入 --token 设置的口令" autocomplete="off">
+      <button id="tokenSave" class="btn primary">保存</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">1</span>连接设备</h2>
+    <div class="row">
+      <input id="hostInput" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="设备 IP，如 192.168.1.20">
+      <input id="portInput" class="port" type="number" inputmode="numeric" value="5555" aria-label="端口">
+    </div>
+    <button id="connectBtn" class="btn primary wide">连接该设备</button>
+    <div id="deviceList" class="device-list"></div>
+    <p class="hint" id="currentDevice">当前设备：未选择</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2</span>安装应用</h2>
+    <label class="filepick" for="apkFile">
+      <span id="fileName">点此选择 .apk 文件</span>
+      <input id="apkFile" type="file" accept=".apk,application/vnd.android.package-archive">
+    </label>
+    <button id="installBtn" class="btn primary wide" disabled>安装到当前设备</button>
+    <p class="hint">APK 会先上传到运行 server.py 的电脑，再执行 adb install -r（覆盖安装）。大文件上传请保持页面前台。</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3</span>卸载应用</h2>
+    <div class="row">
+      <input id="searchInput" type="search" placeholder="搜索包名" autocapitalize="off" spellcheck="false">
+      <select id="scopeSelect" aria-label="应用范围">
+        <option value="user">用户应用</option>
+        <option value="all">全部应用</option>
+        <option value="system">系统应用</option>
+      </select>
+      <button id="refreshBtn" class="btn">刷新</button>
+    </div>
+    <div class="row">
+      <input id="manualPkg" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="或直接输入完整包名">
+      <button id="manualUninstallBtn" class="btn ghost-danger">卸载</button>
+    </div>
+    <div id="packageList" class="pkg-list"></div>
+    <p class="hint" id="pkgCount">尚未加载应用列表</p>
+  </section>
+
+  <section class="card hidden" id="shellCard">
+    <h2><span class="num">4</span>自定义 adb shell</h2>
+    <div class="row" style="margin-bottom:0;">
+      <input id="shellInput" type="text" autocapitalize="off" spellcheck="false" placeholder="如 getprop ro.product.model">
+      <button id="shellBtn" class="btn">执行</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="loghead"><h2>操作记录</h2><button id="clearLogBtn" class="btn tiny">清空</button></div>
+    <div id="log" class="log"></div>
+  </section>
+
+  <footer>
+    <strong>安全提示：</strong>ADB over TCP/IP 是明文、无认证的协议，任何能连上设备 5555 端口的人都可完全控制该设备。请只在可信的家庭 WiFi 下使用，不要把本服务或设备端口映射到公网；用完请在开发者选项里关闭「无线调试」。卸载系统应用前请确认包名，误删可能导致系统异常。
+  </footer>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+
+  function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  var state = {
+    token: lsGet('iadc_token'),
+    device: lsGet('iadc_device'),
+    packages: [],
+    status: null
+  };
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('#toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2800);
+  }
+
+  function log(msg, kind) {
+    var box = $('#log');
+    var line = document.createElement('div');
+    line.className = 'line ' + (kind || '');
+    var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    line.textContent = '[' + t + '] ' + msg;
+    box.appendChild(line);
+    while (box.children.length > 200) { box.removeChild(box.firstChild); }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function setBusy(btn, busy, busyText) {
+    if (!btn.dataset.orig) { btn.dataset.orig = btn.textContent; }
+    btn.disabled = busy;
+    btn.textContent = busy ? busyText : btn.dataset.orig;
+  }
+
+  function showAlert(msg) {
+    var el = $('#alert');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    var headers = Object.assign({}, opts.headers || {});
+    if (opts.json !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(opts.json);
+    }
+    if (state.token) { headers['X-Access-Token'] = state.token; }
+    var res;
+    try {
+      res = await fetch(path, { method: opts.method || 'GET', headers: headers, body: opts.body });
+    } catch (e) {
+      throw new Error('无法连接服务端：' + e.message);
+    }
+    var data;
+    try { data = await res.json(); }
+    catch (e) { throw new Error('服务端返回异常（HTTP ' + res.status + '）'); }
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || data.output || ('HTTP ' + res.status));
+    }
+    return data;
+  }
+
+  function renderStatus(st) {
+    var pill = $('#statusPill');
+    if (st.adb_found) {
+      pill.textContent = 'ADB 就绪';
+      pill.classList.remove('bad');
+      log('服务端已连接，adb：' + st.adb_path, 'ok');
+      if (st.adb_version) { log(st.adb_version, 'dim'); }
+    } else {
+      pill.textContent = '缺少 ADB';
+      pill.classList.add('bad');
+      showAlert('运行 server.py 的电脑上没有找到 adb，安装/卸载功能不可用。\n' +
+        'macOS: brew install android-platform-tools\n' +
+        'Ubuntu: sudo apt install android-sdk-platform-tools\n' +
+        'Windows: 下载 Android SDK Platform-Tools 并解压，然后用 --adb 指定路径');
+    }
+    if (st.require_token) {
+      $('#tokenCard').classList.remove('hidden');
+      $('#tokenInput').value = state.token;
+    }
+    if (st.allow_shell) { $('#shellCard').classList.remove('hidden'); }
+  }
+
+  function setCurrentDevice(serial) {
+    state.device = serial || '';
+    lsSet('iadc_device', state.device);
+    $('#currentDevice').textContent = state.device
+      ? '当前设备：' + state.device
+      : '当前设备：未选择';
+  }
+
+  function renderDevices(devices) {
+    var list = $('#deviceList');
+    list.textContent = '';
+    if (!devices.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '暂无设备。填入 Android 设备的局域网 IP，点「连接该设备」。';
+      list.appendChild(empty);
+      return;
+    }
+    devices.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'device' + (d.serial === state.device ? ' active' : '');
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var serial = document.createElement('div');
+      serial.className = 'serial';
+      serial.textContent = d.serial;
+      var detail = document.createElement('div');
+      detail.className = 'detail';
+      var bits = [];
+      if (d.model) { bits.push(d.model); }
+      if (d.product) { bits.push(d.product); }
+      bits.push(d.state === 'device' ? '在线' : d.state);
+      detail.textContent = bits.join(' · ');
+      meta.appendChild(serial);
+      meta.appendChild(detail);
+
+      var btn = document.createElement('button');
+      btn.className = 'btn tiny ghost-danger';
+      btn.textContent = '断开';
+      btn.addEventListener('click', async function (ev) {
+        ev.stopPropagation();
+        try {
+          var r = await api('/api/disconnect', { method: 'POST', json: { device: d.serial } });
+          log('[断开] ' + d.serial + '\n' + r.output, r.success ? 'ok' : 'err');
+          if (state.device === d.serial) { setCurrentDevice(''); }
+          await refreshDevices();
+          renderPackages();
+        } catch (e) { log('[断开失败] ' + e.message, 'err'); toast(e.message); }
+      });
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      row.addEventListener('click', function () {
+        setCurrentDevice(d.serial);
+        renderDevices(devices);
+        toast('已选择 ' + d.serial);
+        refreshPackages().catch(function (e) { log('[应用列表] ' + e.message, 'err'); });
+      });
+      list.appendChild(row);
+    });
+  }
+
+  async function refreshDevices() {
+    try {
+      var d = await api('/api/devices');
+      renderDevices(d.devices || []);
+      var online = (d.devices || []).filter(function (x) { return x.state === 'device'; });
+      if (state.device && !online.some(function (x) { return x.serial === state.device; })) {
+        // 已选设备掉线时保留选择，但给出提示
+        $('#currentDevice').textContent = '当前设备：' + state.device + '（未在线）';
+      }
+      return d;
+    } catch (e) {
+      log('[设备列表] ' + e.message, 'err');
+      return null;
+    }
+  }
+
+  function renderPackages() {
+    var list = $('#packageList');
+    var keyword = $('#searchInput').value.trim().toLowerCase();
+    var matched = state.packages.filter(function (p) {
+      return !keyword || p.toLowerCase().indexOf(keyword) !== -1;
+    });
+    list.textContent = '';
+    if (!state.packages.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = state.device ? '未读取到应用，点「刷新」重试。' : '请先选择一台设备。';
+      list.appendChild(empty);
+      return;
+    }
+    if (!matched.length) {
+      var none = document.createElement('div');
+      none.className = 'empty';
+      none.textContent = '没有匹配的包名';
+      list.appendChild(none);
+      return;
+    }
+    var limit = Math.min(matched.length, 300);
+    for (var i = 0; i < limit; i++) {
+      (function (pkg) {
+        var row = document.createElement('div');
+        row.className = 'pkg';
+        var name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = pkg;
+        var btn = document.createElement('button');
+        btn.className = 'btn tiny ghost-danger';
+        btn.textContent = '卸载';
+        btn.addEventListener('click', function () { uninstall(pkg); });
+        row.appendChild(name);
+        row.appendChild(btn);
+        list.appendChild(row);
+      })(matched[i]);
+    }
+    if (matched.length > limit) {
+      var more = document.createElement('div');
+      more.className = 'empty';
+      more.textContent = '仅显示前 300 条，请用搜索框缩小范围（共 ' + matched.length + ' 条）';
+      list.appendChild(more);
+    }
+  }
+
+  async function refreshPackages() {
+    if (!state.device) {
+      state.packages = [];
+      renderPackages();
+      $('#pkgCount').textContent = '请先选择设备';
+      return;
+    }
+    var scope = $('#scopeSelect').value;
+    var d = await api('/api/packages?device=' + encodeURIComponent(state.device) +
+                      '&scope=' + encodeURIComponent(scope));
+    state.packages = d.packages || [];
+    renderPackages();
+    var sel = $('#scopeSelect');
+    $('#pkgCount').textContent = '共 ' + d.count + ' 个应用（' + sel.options[sel.selectedIndex].text + '）';
+  }
+
+  async function uninstall(pkg) {
+    pkg = (pkg || '').trim();
+    if (!pkg) { toast('请输入包名'); return; }
+    if (!state.device) { toast('请先选择设备'); return; }
+    if (!window.confirm('确定卸载 ' + pkg + ' 吗？\n此操作不可撤销。')) { return; }
+    try {
+      var d = await api('/api/uninstall', {
+        method: 'POST', json: { device: state.device, package: pkg }
+      });
+      log('[卸载] ' + pkg + '\n' + d.output, d.success ? 'ok' : 'err');
+      toast(d.success ? '卸载成功' : '卸载失败，请查看记录');
+      if (d.success) { await refreshPackages(); }
+    } catch (e) {
+      log('[卸载失败] ' + e.message, 'err');
+      toast(e.message);
+    }
+  }
+
+  function bind() {
+    $('#tokenSave').addEventListener('click', function () {
+      state.token = $('#tokenInput').value.trim();
+      lsSet('iadc_token', state.token);
+      toast('已保存，正在重新连接');
+      setTimeout(function () { location.reload(); }, 600);
+    });
+
+    $('#connectBtn').addEventListener('click', async function () {
+      var btn = this;
+      var host = $('#hostInput').value.trim();
+      var port = parseInt($('#portInput').value, 10) || 5555;
+      if (!host) { toast('请填写设备 IP'); return; }
+      setBusy(btn, true, '连接中…');
+      try {
+        var d = await api('/api/connect', { method: 'POST', json: { host: host, port: port } });
+        log('[连接] ' + d.target + '\n' + d.output, d.connected ? 'ok' : 'err');
+        toast(d.connected ? '连接成功' : '连接失败，请查看记录');
+        await refreshDevices();
+        if (d.connected) {
+          setCurrentDevice(d.target);
+          await refreshDevices();
+          try { await refreshPackages(); }
+          catch (e) { log('[应用列表] ' + e.message, 'err'); }
+        }
+      } catch (e) {
+        log('[连接失败] ' + e.message, 'err');
+        toast(e.message);
+      } finally { setBusy(btn, false); }
+    });
+
+    $('#apkFile').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      $('#fileName').textContent = f ? f.name + '（' + (f.size / 1048576).toFixed(1) + ' MB）' : '点此选择 .apk 文件';
+      $('#installBtn').disabled = !f;
+    });
+
+    $('#installBtn').addEventListener('click', async function () {
+      var btn = this;
+      var f = $('#apkFile').files && $('#apkFile').files[0];
+      if (!f) { toast('请先选择 APK 文件'); return; }
+      if (!state.device) { toast('请先选择设备'); return; }
+      setBusy(btn, true, '上传并安装中…');
+      log('[安装] 开始上传 ' + f.name + ' 到 ' + state.device, 'dim');
+      try {
+        var d = await api('/api/install', {
+          method: 'POST',
+          headers: {
+            'X-Device': state.device,
+            'X-Filename': 'upload.apk',
+            'Content-Type': 'application/octet-stream'
+          },
+          body: f
+        });
+        log('[安装] ' + f.name + '\n' + d.output, d.success ? 'ok' : 'err');
+        toast(d.success ? '安装成功' : '安装失败，请查看记录');
+        if (d.success) { await refreshPackages(); }
+      } catch (e) {
+        log('[安装失败] ' + e.message, 'err');
+        toast(e.message);
+      } finally { setBusy(btn, false); }
+    });
+
+    $('#refreshBtn').addEventListener('click', async function () {
+      try { await refreshPackages(); toast('已刷新'); }
+      catch (e) { log('[应用列表] ' + e.message, 'err'); toast(e.message); }
+    });
+    $('#scopeSelect').addEventListener('change', function () {
+      refreshPackages().catch(function (e) { log('[应用列表] ' + e.message, 'err'); });
+    });
+    $('#searchInput').addEventListener('input', renderPackages);
+    $('#manualUninstallBtn').addEventListener('click', function () {
+      var pkg = $('#manualPkg').value.trim();
+      uninstall(pkg);
+      if (pkg) { $('#manualPkg').value = ''; }
+    });
+
+    $('#shellBtn').addEventListener('click', async function () {
+      var cmd = $('#shellInput').value.trim();
+      if (!cmd) { toast('请输入命令'); return; }
+      if (!state.device) { toast('请先选择设备'); return; }
+      try {
+        var d = await api('/api/shell', {
+          method: 'POST', json: { device: state.device, command: cmd }
+        });
+        log('[shell] ' + cmd + '\n' + d.output, d.success ? 'ok' : 'err');
+      } catch (e) { log('[shell 失败] ' + e.message, 'err'); toast(e.message); }
+    });
+
+    $('#clearLogBtn').addEventListener('click', function () { $('#log').textContent = ''; });
+  }
+
+  async function init() {
+    bind();
+    setCurrentDevice(state.device);
+    try {
+      var st = await api('/api/status');
+      state.status = st;
+      renderStatus(st);
+    } catch (e) {
+      $('#statusPill').textContent = '离线';
+      $('#statusPill').classList.add('bad');
+      log('[状态] ' + e.message, 'err');
+      showAlert('无法连接服务端：' + e.message + '\n请确认电脑上 server.py 正在运行，且 iPhone 与电脑在同一 WiFi。');
+    }
+    await refreshDevices();
+    if (state.device) {
+      try { await refreshPackages(); }
+      catch (e) { log('[应用列表] ' + e.message, 'err'); }
+    } else {
+      renderPackages();
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
