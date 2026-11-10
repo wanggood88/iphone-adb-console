@@ -17,13 +17,36 @@
 
 如果你要管理的是 **iPhone 自身的应用**（安装/卸载 `.ipa`），那需要的是 `libimobiledevice` / `ideviceinstaller` / iDescriptor，与本项目无关。
 
+## 只想开箱即用？先看这里
+
+**如果你的设备是「一台 iPhone + 一台已经开放 5555 的设备」，本项目其实不是最省事的选择。** 上面说的限制只针对**网页**：iPhone 装一个**原生 App 就能自己跑 adb 客户端**，不必借电脑、不必装 Termux、不必跑任何服务端。
+
+| 方案 | 形态 | 装/卸 APK | 费用 | 说明 |
+| --- | --- | --- | --- | --- |
+| [ADBox](https://apps.apple.com/cn/app/adbox-tv-device-debug-viewer/id6777080682) | App Store 原生 App，纯本地客户端、无后端无账号 | 支持（另有文件、Shell、logcat、投屏） | 浏览免费；装卸等 Pro 功能月订阅 ¥22 / 终身 ¥88 | **最贴合「iPhone + 只开 5555 的盒子 / 电视」**，需 iOS 17+ |
+| [iSH Shell](https://ish.app/) | App Store 免费，在 iOS 上跑 Alpine Linux | `apk add android-tools` 后用 adb 命令 | 免费 | 不付费、能接受命令行 |
+| [Scrcpy Remote / scrcpy-mobile](https://github.com/wsvn53/scrcpy-mobile) | App Store 原生 App（MIT 开源） | 以投屏控制为主 | 约 ¥6–10 | 主要想远程操控屏幕 |
+
+> **甲壳虫 ADB 助手只有 Android 版，iPhone 装不了**；ADBox 基本就是它在 iOS 上的对应物。本项目适合的是：想要**免费、无订阅、自己可控、且用 Safari 网页而不是装 App** 的场景。
+
+iSH 里连 5555（**不需要配对**）：
+
+```bash
+apk add android-tools
+adb connect 192.168.1.50:5555   # 首次在设备上点「允许 USB 调试」并勾选始终允许
+adb devices
+adb install -r /path/app.apk
+adb uninstall com.example.app
+```
+
 ## 模式 A：电脑跑服务（最简单）
 
 ### 1. 让 Android 设备开放 5555
 
 - **已 root 或曾 USB 连过电脑**（最经典）：USB 连上电脑，执行 `adb tcpip 5555`，然后拔掉数据线。之后设备就在 `<手机IP>:5555` 上监听。
 - **部分电视盒子 / 模拟器 / 开发板**：出厂就默认监听 5555，直接用即可。
-- **Android 11+ 原生「无线调试」**：端口是随机的并且需要先 `adb pair <IP>:<配对端口> <配对码>` 配对，之后才能 `adb connect <IP>:<调试端口>`。本工具目前只做 `connect`，请先用电脑完成配对，或改用上面的 `adb tcpip 5555` 方式。
+- **Android 11+ 原生「无线调试」**：端口是随机的，需先 `adb pair <IP>:<配对端口> <配对码>` 配对，再 `adb connect <IP>:<调试端口>`（**配对端口 ≠ 调试端口**）。本工具只提供 `connect`，配对请在任意能跑 adb 的地方先完成（电脑、iPhone 的 iSH、或设备自己的 Termux 都可以，**不需要电脑**），再把无线调试主页面显示的**调试端口**填进网页连接框——`/api/connect` 支持 1–65535 任意端口。
+- **只开 5555 的设备（盒子 / 车机 / 传统 `adb tcpip 5555`）**：**没有配对这一步**。`adb connect <IP>:5555` 直连，首次在设备上点一次「允许 USB 调试」RSA 授权框即可。
 
 > 手机和电脑必须在**同一个局域网**。记下设备 IP（如 `192.168.1.20`）。
 
@@ -164,7 +187,7 @@ ADB_TARGET=192.168.1.50:5555 IADC_TOKEN=你的口令 bash termux/start.sh
 
 **iPhone 打不开页面？** 确认 iPhone 与「跑 server.py 的那台机器」（电脑，或装了 Termux 的 Android 设备）在同一 WiFi；关闭路由器的「AP 客户端隔离」；电脑需放行 8000 端口；一律用 `http://` 而不是 `https://`；Windows 需在「专用网络」下允许 Python 通过防火墙。不要把本页放进 HTTPS 站点去调用本地 HTTP 服务，浏览器会拦截混合内容。
 
-**能完全不要电脑吗？同 WiFi 直接连不行吗？** 网页方案不行——浏览器没有裸 TCP Socket API、iOS Safari 也没有 WebUSB，这与是否同 WiFi 无关；但把服务端搬到 Android 设备自己的 Termux 上就可以，见「模式 B」，此时同 WiFi 完全够用。若想 iPhone 原生直连 5555，需基于 adb-ios / adb-mobile 编译 iOS App 并签名侧载。
+**能完全不要电脑吗？同 WiFi 直接连不行吗？** **装原生 App 就可以**：ADBox / iSH / Scrcpy Remote 让 iPhone 自己跑 adb 客户端，同 WiFi 直连 5555，完全不要电脑（见「只想开箱即用」）。**网页方案不行**——浏览器没有裸 TCP Socket API、iOS Safari 也没有 WebUSB，这与是否同 WiFi 无关；所以本项目的网页必须配一个跑 `server.py` 的地方（电脑，或设备自己的 Termux，见模式 B）。基于 adb-ios / adb-mobile 自编译侧载也能原生直连，但现在有上架成品，通常没必要。
 
 **连不上 5555？** 确认设备已开启 USB/无线调试并授权过；IP 是否变化；端口是否是 5555（Android 11+ 原生无线调试端口是随机的）；可先在服务端机器上手工执行 `adb connect IP:5555` 验证。
 
@@ -182,7 +205,8 @@ ADB_TARGET=192.168.1.50:5555 IADC_TOKEN=你的口令 bash termux/start.sh
 - [liriliri/aya](https://github.com/liriliri/aya)、[ludoven/QADB](https://github.com/ludoven/QADB) — 桌面 ADB GUI
 - [oop7/Android-debloater](https://github.com/oop7/Android-debloater) — Tauri + React，自带 ADB
 - [GoogleChromeLabs/ya-webadb](https://github.com/GoogleChromeLabs/ya-webadb) — 浏览器 WebUSB 方案；其作者明确说明「浏览器没有创建 TCP 连接的 API」，这也是本项目采用「服务端代跑 adb」架构的原因
-- [zonghai-li/adb-ios](https://github.com/zonghai-li/adb-ios)、[wsvn53/adb-mobile](https://github.com/wsvn53/adb-mobile) — 把 ADB host 移植成 iOS 静态库，iPhone 可原生直连 5555（需 Xcode 编译签名侧载）
+- [zonghai-li/adb-ios](https://github.com/zonghai-li/adb-ios)、[wsvn53/adb-mobile](https://github.com/wsvn53/adb-mobile) — 把 ADB host 移植成 iOS 静态库，iPhone 可原生直连 5555（需 Xcode 编译签名侧载）；同作者的 [scrcpy-mobile](https://github.com/wsvn53/scrcpy-mobile) 已上架 App Store
+- [termux/termux-app](https://github.com/termux/termux-app)、[ish-app/ish](https://github.com/ish-app/ish) — 分别在 Android / iOS 上提供能跑 `adb` 的本地终端，是「零电脑」的关键
 - [yume-chan/ya-webadb (Tango ADB)](https://github.com/yume-chan/ya-webadb) — TypeScript 实现的 ADB 协议栈；配合微信小程序的 `wx.createTCPSocket` 可在 iPhone 微信里直连 adbd，同样无需中间设备
 - [libimobiledevice/ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) — 若目标换成 iPhone 本身，应看这个
 
