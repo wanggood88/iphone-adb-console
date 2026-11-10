@@ -141,22 +141,35 @@ ADB_TARGET=192.168.1.50:5555 IADC_TOKEN=你的口令 bash termux/start.sh
    只走本机 loopback                     不经过 WiFi / 热点网络                    只有这一跳跨网络
 ```
 
-### 步骤
+### 步骤（最短路径：可视化装一个 APK + 跑一条命令）
 
 1. 让车机开放 5555 并记下 IP（见模式 A 第 1 节 / 车机专属说明）。
-2. iPhone 装 **iSH**；把本仓库放进 iSH 的文件目录：iOS「文件」App → `iSH` → `root`，或直接 `apk add git` 后 `git clone`。
-3. 在 iSH 里：
+2. iPhone 装 **iSH**（App Store 免费）。仓库用 `git clone` 拿进 iSH 即可，**不用在「文件」App 里找 iSH 文件夹、也不用手动搬文件**：
 
 ```sh
-apk add python3 android-tools
+apk add python3 android-tools git
+git clone https://github.com/wanggood88/iphone-adb-console.git
 cd ~/iphone-adb-console
-sh ish/start.sh
-# 建议带口令：IADC_TOKEN=你的口令 sh ish/start.sh
-# 想在网页里执行任意 adb 命令：IADC_TOKEN=你的口令 IADC_SHELL=1 sh ish/start.sh
+IADC_TOKEN=你的口令 IADC_SHELL=1 sh ish/start.sh
 ```
 
-4. Safari 打开 **`http://127.0.0.1:8000`**（用 `http`，不要 `https`），填口令 → 输入车机 IP、端口 5555 → 连接 → 装/卸应用。启用 `IADC_SHELL=1` 后页面会出现「自定义 adb shell」输入框。
-5. 也可以不通过浏览器，直接在 iSH 终端敲 `adb connect IP:5555`、`adb install -r x.apk`、`adb uninstall 包名`、`adb shell ...`。
+> **`IADC_SHELL=1` 不能省**——否则网页里不会出现「自定义 adb shell」输入框，就没地方跑那条 `pm grant`。`IADC_TOKEN` 可留空，但建议设一个。
+
+3. Safari 打开 **`http://127.0.0.1:8000`**（用 `http`，不要 `https`），填口令 → 输入车机 IP、端口 5555 → 点「连接该设备」→ 在设备列表里点一下选中。
+
+**装 APK**：点「点此选择 .apk 文件」→ 从 iOS 系统文件选择器里直接选 `QiPlay.apk`（「我的 iPhone」/ 下载项 / iCloud / 微信存到「文件」的都行）→ 点「安装到当前设备」。APK 由 Safari 上传到 iSH，服务端自动存临时目录并 `adb install -r`，**用完即删——不需要先把它弄进 iSH 的 `/root`，也不需要 `mount`**。
+
+**跑命令**：在「自定义 adb shell」输入框里填：
+
+```sh
+pm grant com.qipay android.permission.READ_LOGS
+```
+
+点「执行」，结果显示在「操作记录」里。
+
+> ⚠️ **网页输入框里不要带 `adb shell` 前缀。** 服务端执行的已经是 `adb -s <设备> shell <你填的内容>`；若填 `adb shell pm grant ...`，等于在车机上再跑一次 `adb shell`，必然失败。命令行里的完整写法 `adb shell pm grant ...` 只适用于 iSH 终端，不适用于网页输入框。同理，网页里也**不能**填 `adb install`、`adb connect`（这些是按钮，不是 shell 命令）。
+
+4. 也可以完全不走浏览器，直接在 iSH 终端敲 `adb connect IP:5555`、`adb install -r x.apk`、`adb uninstall 包名`、`adb shell ...`。
 
 > **iSH 里怎么敲命令、怎么一次执行多条**：见 [ish/COMMANDS.md](ish/COMMANDS.md)。最常用的是一条命令串完「连接 → 安装 → 执行 adb 命令」：
 > ```sh
