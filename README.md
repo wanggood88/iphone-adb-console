@@ -4,9 +4,9 @@
 
 ```
 [ iPhone Safari ]  --HTTP-->  [ server.py + adb ]  --adb connect IP:5555-->  [ Android 设备 ]
-   只负责显示界面          真正执行安装/卸载             手机 / 盒子 / 模拟器
-                          可跑在电脑，也可跑在
-                          Android 设备自己的 Termux 里（模式 B，零电脑）
+   只负责显示界面          真正执行安装/卸载             车机 / 盒子 / 手机
+                          可跑在电脑（模式 A）、Android 设备自己的
+                          Termux（模式 B），或 iPhone 自己的 iSH（模式 C）
 ```
 
 ## 先弄清一个前提
@@ -27,7 +27,7 @@
 | [iSH Shell](https://ish.app/) | App Store 免费，在 iOS 上跑 Alpine Linux | `apk add android-tools` 后用 adb 命令 | 免费 | 不付费、能接受命令行 |
 | [Scrcpy Remote / scrcpy-mobile](https://github.com/wsvn53/scrcpy-mobile) | App Store 原生 App（MIT 开源） | 以投屏控制为主 | 约 ¥6–10 | 主要想远程操控屏幕 |
 
-> **甲壳虫 ADB 助手只有 Android 版，iPhone 装不了**；ADBox 基本就是它在 iOS 上的对应物。本项目适合的是：想要**免费、无订阅、自己可控、且用 Safari 网页而不是装 App** 的场景。
+> **甲壳虫 ADB 助手只有 Android 版，iPhone 装不了**；ADBox 基本就是它在 iOS 上的对应物。本项目适合的是：想要**免费、无订阅、自己可控、且用 Safari 网页而不是装 App** 的场景——具体做法见「模式 C」：把本项目的服务端直接跑在 iPhone 自己的 iSH 里。
 
 iSH 里连 5555（**不需要配对**）：
 
@@ -130,6 +130,52 @@ ADB_TARGET=192.168.1.50:5555 IADC_TOKEN=你的口令 bash termux/start.sh
 - 设备重启后 5555 可能关闭；Termux 需保持后台运行（关闭电池优化、后台加锁）。
 - 路由器开启「AP 客户端隔离」时 iPhone 访问不到设备的 8000 端口，需关闭隔离。
 - `server.py` 与 `index.html` 和模式 A 完全相同，零改动；只是把运行环境从电脑换成了设备自己。
+- **车机 / TV 盒子通常装不了也操作不了 Termux，模式 B 不适用**；这类设备请用「只想开箱即用」里的现成 App，或下面的模式 C。
+
+## 模式 C：iPhone 本机跑服务（iSH + Safari，真正只用两台设备）
+
+**浏览器本身不能直连 5555，但服务端可以跑在 iPhone 自己身上。** [iSH Shell](https://ish.app/)（App Store 免费，在 iOS 上跑 Alpine Linux）里能同时装 Python 3 和 adb；用它跑 `server.py`，再用 Safari 打开 `http://127.0.0.1:8000`，网页就能装/卸 APK、列应用、执行 adb 命令。
+
+```
+[ iPhone Safari ] --127.0.0.1:8000--> [ 同一台 iPhone：iSH 跑 server.py + adb ] --IP:5555--> [ 车机 ]
+   只走本机 loopback                     不经过 WiFi / 热点网络                    只有这一跳跨网络
+```
+
+### 步骤
+
+1. 让车机开放 5555 并记下 IP（见模式 A 第 1 节 / 车机专属说明）。
+2. iPhone 装 **iSH**；把本仓库放进 iSH 的文件目录：iOS「文件」App → `iSH` → `root`，或直接 `apk add git` 后 `git clone`。
+3. 在 iSH 里：
+
+```sh
+apk add python3 android-tools
+cd ~/iphone-adb-console
+sh ish/start.sh
+# 建议带口令：IADC_TOKEN=你的口令 sh ish/start.sh
+# 想在网页里执行任意 adb 命令：IADC_TOKEN=你的口令 IADC_SHELL=1 sh ish/start.sh
+```
+
+4. Safari 打开 **`http://127.0.0.1:8000`**（用 `http`，不要 `https`），填口令 → 输入车机 IP、端口 5555 → 连接 → 装/卸应用。启用 `IADC_SHELL=1` 后页面会出现「自定义 adb shell」输入框。
+5. 也可以不通过浏览器，直接在 iSH 终端敲 `adb connect IP:5555`、`adb install -r x.apk`、`adb uninstall 包名`、`adb shell ...`。
+
+### 组网：别押注在 iPhone 个人热点上
+
+Safari 访问 `127.0.0.1` 是本机 loopback，**与热点/WiFi 怎么组无关**；只有 iSH 里 `adb connect` 那一跳需要能到达车机的 5555。
+
+| 组网 | 建议 |
+| --- | --- |
+| iPhone 和车机连**同一个普通 WiFi**（家里路由器、便携路由器、另一台设备开的热点） | ✅ 最稳 |
+| **车机开热点、iPhone 连它**（车机是网关） | ✅ 通常可行，客户端主动连网关 |
+| **iPhone 开个人热点、车机连它**（iPhone 是网关，车机拿 `172.20.10.x`） | ⚠️ iOS 个人热点默认做 NAT + 客户端隔离，Apple 文档明确「不提供客户端之间的通信」；iPhone 本机能否访问热点客户端的端口没有稳定保证，不同 iOS 版本 / USB 共享 /「最大兼容性」表现不一 |
+
+第三种先在 iSH 里试一发 `adb connect 172.20.10.x:5555`；连不上就换前两种，**这不影响网页本身能不能打开**。另外车机连 iPhone 热点时常常因为没有外网而反复重连，会拖垮 adb 会话。
+
+### iSH 的两个坑
+
+- **后台会被冻结**：iOS 切走 iSH 后会暂停其进程，Safari 页面可能一直转圈。切回 iSH 一次再切回 Safari；iPad 用分屏、iPhone 用「引导式访问」，或 `apk add tmux` 后在 tmux 会话里跑脚本。
+- iSH 是 x86 模拟环境，上传大 APK 会明显慢于电脑；`adb` 来自 Alpine 的 `android-tools`，连固定 5555 够用，但版本可能偏老，不一定支持 Android 11+ 的 `adb pair`。本项目模式 C 面向**固定 5555** 的车机 / 盒子场景。
+
+> 安全：`--allow-shell` 等于把车机 shell 暴露给能访问 `127.0.0.1:8000` 的人；虽然只有本机可达，仍建议同时设置 `IADC_TOKEN`。用完关闭车机的 5555 / 无线调试。
 
 ## 功能
 
@@ -187,7 +233,7 @@ ADB_TARGET=192.168.1.50:5555 IADC_TOKEN=你的口令 bash termux/start.sh
 
 **iPhone 打不开页面？** 确认 iPhone 与「跑 server.py 的那台机器」（电脑，或装了 Termux 的 Android 设备）在同一 WiFi；关闭路由器的「AP 客户端隔离」；电脑需放行 8000 端口；一律用 `http://` 而不是 `https://`；Windows 需在「专用网络」下允许 Python 通过防火墙。不要把本页放进 HTTPS 站点去调用本地 HTTP 服务，浏览器会拦截混合内容。
 
-**能完全不要电脑吗？同 WiFi 直接连不行吗？** **装原生 App 就可以**：ADBox / iSH / Scrcpy Remote 让 iPhone 自己跑 adb 客户端，同 WiFi 直连 5555，完全不要电脑（见「只想开箱即用」）。**网页方案不行**——浏览器没有裸 TCP Socket API、iOS Safari 也没有 WebUSB，这与是否同 WiFi 无关；所以本项目的网页必须配一个跑 `server.py` 的地方（电脑，或设备自己的 Termux，见模式 B）。基于 adb-ios / adb-mobile 自编译侧载也能原生直连，但现在有上架成品，通常没必要。
+**能完全不要电脑吗？同 WiFi 直接连不行吗？** **装原生 App 就可以**：ADBox / iSH / Scrcpy Remote 让 iPhone 自己跑 adb 客户端，同 WiFi 直连 5555，完全不要电脑（见「只想开箱即用」）。**浏览器直接连 5555 不行**——浏览器没有裸 TCP Socket API、iOS Safari 也没有 WebUSB，这与是否同 WiFi 无关。但**网页界面本身可以只用一台 iPhone**：把 `server.py` 跑在 iSH 里、Safari 打开 `http://127.0.0.1:8000`（见模式 C）；否则网页就得另配一个跑服务的地方（电脑，或设备自己的 Termux，见模式 B）。基于 adb-ios / adb-mobile 自编译侧载也能原生直连，但现在有上架成品，通常没必要。
 
 **连不上 5555？** 确认设备已开启 USB/无线调试并授权过；IP 是否变化；端口是否是 5555（Android 11+ 原生无线调试端口是随机的）；可先在服务端机器上手工执行 `adb connect IP:5555` 验证。
 
